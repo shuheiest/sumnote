@@ -2,3 +2,13 @@
 
 # dependencies
 node_modules/
+
+# claude
+.claude/
+
+# misc
+tsconfig.tsbuildinfo
+$*.ts
+.env
+*.mp3
+*.pdf

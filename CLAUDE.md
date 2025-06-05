@@ -1,20 +1,18 @@
-# CLAUDE.md
+# 音声＆ドキュメント共有ポータル
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## 概要
 
-## Project Overview
+Gemini 等で生成した要約（PDF）と音声（MP3）を、プロジェクトメンバーで共有・閲覧・コメントできる Web サービスを作成します。
 
-This is a minimal Node.js project named "sumnote" in its initial development phase. The project currently has a basic package.json setup with only the `@anthropic-ai/claude-code` dependency.
+## 要件
 
-## Development Commands
-
-Currently, the project only has a placeholder test script:
-- `npm test` - Exits with error (no tests implemented yet)
-
-## Project Structure
-
-This is a new project with minimal structure:
-- Basic Node.js project setup
-- Single dependency on @anthropic-ai/claude-code
-- No source code files yet (only package configuration)
-- No build system, testing framework, or linting tools configured yet
+- PDF と音声ファイルをアップロード、閲覧、コメントできるポータルサイト
+- ドメイン駆動設計（DDD）を採用
+- バックエンドは TypeScript + Prisma（PostgreSQL）
+  - Prisma のスキーマは変更容易性を重視し、型制約は緩め（string や number 程度）
+  - Prisma による DB 操作
+- フロントエンドは TypeScript + React
+- フロントエンドのテストは今回は不要
+- バックエンドにのみテストファイルを作成
+  - テストカバレッジは 95%以上を目標
+- データベースは PostgreSQL を使用
