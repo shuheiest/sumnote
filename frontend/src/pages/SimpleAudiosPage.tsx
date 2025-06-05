@@ -7,63 +7,50 @@ import {
   Button,
   Dialog,
   DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
   Grid,
   IconButton,
   Chip,
 } from '@mui/material';
 import {
   Add,
-  CloudUpload,
   Delete,
   PlayArrow,
   Pause,
-  GetApp,
+  AudioFile,
 } from '@mui/icons-material';
-import { useDropzone } from 'react-dropzone';
 import { useAudios } from '../hooks/useAudios';
+import { useContentFilters } from '../hooks/useContentFilters';
+import { AudioUploadForm } from '../components/AudioUploadForm';
+import { ContentFilters } from '../components/ContentFilters';
+import { ContentGridSkeleton, EmptyState } from '../components/SkeletonLoaders';
+import { AudioUploadFormData } from '../schemas/validation';
 
 const SimpleAudiosPage: React.FC = () => {
   const { audios, loading, uploadAudio, deleteAudio } = useAudios();
+  const { filters, setFilters, filteredItems, totalCount, filteredCount } = useContentFilters(audios);
   const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string>('');
   const [playingId, setPlayingId] = useState<string | null>(null);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    accept: {
-      'audio/mpeg': ['.mp3'],
-      'audio/wav': ['.wav'],
-      'audio/ogg': ['.ogg'],
-    },
-    multiple: false,
-    onDrop: (acceptedFiles) => {
-      if (acceptedFiles.length > 0) {
-        setSelectedFile(acceptedFiles[0]);
-        setTitle(acceptedFiles[0].name.replace(/\.[^/.]+$/, ''));
-      }
-    },
-  });
-
-  const handleUpload = async () => {
-    if (!selectedFile || !title.trim()) return;
-
+  const handleUpload = async (data: AudioUploadFormData) => {
     setUploading(true);
+    setUploadError('');
     try {
-      await uploadAudio(selectedFile, title, description);
+      await uploadAudio(data.file, data.title, data.description || '');
       setOpen(false);
-      setTitle('');
-      setDescription('');
-      setSelectedFile(null);
     } catch (error) {
-      console.error('Upload failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'アップロードに失敗しました';
+      setUploadError(errorMessage);
+      throw error; // フォームコンポーネントでエラーハンドリングするために再throw
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleCancel = () => {
+    setOpen(false);
+    setUploadError('');
   };
 
   const handleDelete = async (id: string) => {
@@ -145,113 +132,123 @@ const SimpleAudiosPage: React.FC = () => {
         </Button>
       </Box>
 
-      <Grid container spacing={3}>
-        {audios.map((audio) => (
-          <Grid item xs={12} sm={6} md={4} key={audio.id}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  {audio.title}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  {audio.description}
-                </Typography>
-                <Chip
-                  label={new Date(audio.createdAt).toLocaleDateString('ja-JP')}
-                  size="small"
-                  sx={{ mb: 2 }}
-                />
-                <Box display="flex" justifyContent="space-between">
-                  <IconButton onClick={() => handlePlay(audio)} color="primary">
+      {/* フィルター */}
+      <ContentFilters
+        filters={filters}
+        onFiltersChange={setFilters}
+        contentType="audios"
+        totalCount={totalCount}
+        filteredCount={filteredCount}
+      />
+
+      {/* コンテンツグリッド */}
+      {loading ? (
+        <ContentGridSkeleton count={6} />
+      ) : filteredItems.length > 0 ? (
+        <Grid container spacing={3}>
+          {filteredItems.map((audio) => (
+            <Grid item xs={12} sm={6} md={4} key={audio.id}>
+              <Card
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'all 0.2s ease-in-out',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: 4,
+                  },
+                }}
+              >
+                <CardContent sx={{ flexGrow: 1 }}>
+                  <Box display="flex" alignItems="center" mb={1}>
+                    <AudioFile color="primary" sx={{ mr: 1 }} />
+                    <Typography variant="h6" component="h3" noWrap>
+                      {audio.title}
+                    </Typography>
+                  </Box>
+                  
+                  <Typography 
+                    variant="body2" 
+                    color="text.secondary" 
+                    sx={{ 
+                      mb: 2,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {audio.description || 'No description'}
+                  </Typography>
+                  
+                  <Chip
+                    label={new Date(audio.createdAt).toLocaleDateString('ja-JP')}
+                    size="small"
+                    variant="outlined"
+                    sx={{ mb: 2 }}
+                  />
+                </CardContent>
+                
+                <Box display="flex" justifyContent="space-between" px={2} pb={2}>
+                  <IconButton 
+                    onClick={() => handlePlay(audio)} 
+                    color="primary"
+                    sx={{ 
+                      '&:hover': { 
+                        backgroundColor: 'primary.light',
+                        color: 'primary.contrastText',
+                      },
+                    }}
+                  >
                     {playingId === audio.id ? <Pause /> : <PlayArrow />}
                   </IconButton>
                   <IconButton
                     onClick={() => handleDelete(audio.id)}
                     color="error"
+                    sx={{ 
+                      '&:hover': { 
+                        backgroundColor: 'error.light',
+                        color: 'error.contrastText',
+                      },
+                    }}
                   >
                     <Delete />
                   </IconButton>
                 </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-        {audios.length === 0 && !loading && (
-          <Grid item xs={12}>
-            <Card>
-              <CardContent sx={{ textAlign: 'center', py: 4 }}>
-                <Typography variant="body1" color="text.secondary">
-                  音声ファイルがありません
-                </Typography>
-                <Button
-                  variant="outlined"
-                  startIcon={<Add />}
-                  onClick={() => setOpen(true)}
-                  sx={{ mt: 2 }}
-                >
-                  最初の音声ファイルを追加
-                </Button>
-              </CardContent>
-            </Card>
-          </Grid>
-        )}
-      </Grid>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      ) : totalCount === 0 ? (
+        <EmptyState
+          title="音声ファイルがありません"
+          description="最初の音声ファイルをアップロードしてください"
+          actionLabel="音声ファイルを追加"
+          onAction={() => setOpen(true)}
+        />
+      ) : (
+        <EmptyState
+          title="検索結果が見つかりません"
+          description="検索条件を変更してみてください"
+          actionLabel="フィルターをクリア"
+          onAction={() => setFilters({
+            searchTerm: '',
+            sortBy: 'newest',
+            sortOrder: 'desc',
+            filterType: 'all',
+          })}
+        />
+      )}
 
-      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={open} onClose={handleCancel} maxWidth="sm" fullWidth>
         <DialogTitle>音声ファイルアップロード</DialogTitle>
-        <DialogContent>
-          <Box
-            {...getRootProps()}
-            sx={{
-              border: '2px dashed',
-              borderColor: isDragActive ? 'primary.main' : 'grey.300',
-              borderRadius: 1,
-              p: 3,
-              textAlign: 'center',
-              mb: 2,
-              cursor: 'pointer',
-              backgroundColor: isDragActive ? 'action.hover' : 'transparent',
-            }}
-          >
-            <input {...getInputProps()} />
-            <CloudUpload sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-            <Typography variant="body1" gutterBottom>
-              {selectedFile
-                ? `選択済み: ${selectedFile.name}`
-                : '音声ファイルをドラッグ&ドロップまたはクリック'}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              *.mp3, *.wav, *.ogg ファイル対応
-            </Typography>
-          </Box>
-          <TextField
-            fullWidth
-            label="タイトル"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            margin="normal"
-            required
-          />
-          <TextField
-            fullWidth
-            label="説明（任意）"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            margin="normal"
-            multiline
-            rows={3}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpen(false)}>キャンセル</Button>
-          <Button
-            onClick={handleUpload}
-            variant="contained"
-            disabled={!selectedFile || !title.trim() || uploading}
-          >
-            {uploading ? 'アップロード中...' : 'アップロード'}
-          </Button>
-        </DialogActions>
+        <AudioUploadForm
+          onSubmit={handleUpload}
+          onCancel={handleCancel}
+          loading={uploading}
+          error={uploadError}
+        />
       </Dialog>
     </Box>
   );

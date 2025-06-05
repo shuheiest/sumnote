@@ -21,16 +21,22 @@
     "@aspida/axios": "^1.13.0",
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
+    "@hookform/resolvers": "^5.0.1",
     "@mui/icons-material": "^5.13.0",
     "@mui/material": "^5.13.0",
+    "@types/react-window": "^1.8.8",
     "aspida": "^1.13.0",
     "axios": "^1.4.0",
     "react": "^18.2.0",
     "react-audio-player": "^0.17.0",
     "react-dom": "^18.2.0",
     "react-dropzone": "^14.2.0",
+    "react-hook-form": "^7.57.0",
     "react-pdf": "^7.2.0",
-    "react-router-dom": "^6.11.0"
+    "react-router-dom": "^6.11.0",
+    "react-window": "^1.8.11",
+    "react-window-infinite-loader": "^1.0.10",
+    "yup": "^1.6.1"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

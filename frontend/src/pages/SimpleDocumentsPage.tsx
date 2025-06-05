@@ -7,59 +7,49 @@ import {
   Button,
   Dialog,
   DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
   Grid,
   IconButton,
   Chip,
+  Alert,
 } from '@mui/material';
 import {
   Add,
-  CloudUpload,
   Delete,
   Visibility,
-  GetApp,
+  Description,
 } from '@mui/icons-material';
-import { useDropzone } from 'react-dropzone';
 import { useDocuments } from '../hooks/useDocuments';
+import { useContentFilters } from '../hooks/useContentFilters';
+import { DocumentUploadForm } from '../components/DocumentUploadForm';
+import { ContentFilters } from '../components/ContentFilters';
+import { ContentGridSkeleton, EmptyState } from '../components/SkeletonLoaders';
+import { DocumentUploadFormData } from '../schemas/validation';
 
 const SimpleDocumentsPage: React.FC = () => {
   const { documents, loading, uploadDocument, deleteDocument } = useDocuments();
+  const { filters, setFilters, filteredItems, totalCount, filteredCount } = useContentFilters(documents);
   const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string>('');
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    accept: {
-      'application/pdf': ['.pdf'],
-    },
-    multiple: false,
-    onDrop: (acceptedFiles) => {
-      if (acceptedFiles.length > 0) {
-        setSelectedFile(acceptedFiles[0]);
-        setTitle(acceptedFiles[0].name.replace('.pdf', ''));
-      }
-    },
-  });
-
-  const handleUpload = async () => {
-    if (!selectedFile || !title.trim()) return;
-
+  const handleUpload = async (data: DocumentUploadFormData) => {
     setUploading(true);
+    setUploadError('');
     try {
-      await uploadDocument(selectedFile, title, description);
+      await uploadDocument(data.file, data.title, data.description || '');
       setOpen(false);
-      setTitle('');
-      setDescription('');
-      setSelectedFile(null);
     } catch (error) {
-      console.error('Upload failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'アップロードに失敗しました';
+      setUploadError(errorMessage);
+      throw error; // フォームコンポーネントでエラーハンドリングするために再throw
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleCancel = () => {
+    setOpen(false);
+    setUploadError('');
   };
 
   const handleDelete = async (id: string) => {
@@ -91,113 +81,123 @@ const SimpleDocumentsPage: React.FC = () => {
         </Button>
       </Box>
 
-      <Grid container spacing={3}>
-        {documents.map((doc) => (
-          <Grid item xs={12} sm={6} md={4} key={doc.id}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  {doc.title}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  {doc.description}
-                </Typography>
-                <Chip
-                  label={new Date(doc.createdAt).toLocaleDateString('ja-JP')}
-                  size="small"
-                  sx={{ mb: 2 }}
-                />
-                <Box display="flex" justifyContent="space-between">
-                  <IconButton onClick={() => handleView(doc)} color="primary">
+      {/* フィルター */}
+      <ContentFilters
+        filters={filters}
+        onFiltersChange={setFilters}
+        contentType="documents"
+        totalCount={totalCount}
+        filteredCount={filteredCount}
+      />
+
+      {/* コンテンツグリッド */}
+      {loading ? (
+        <ContentGridSkeleton count={6} />
+      ) : filteredItems.length > 0 ? (
+        <Grid container spacing={3}>
+          {filteredItems.map((doc) => (
+            <Grid item xs={12} sm={6} md={4} key={doc.id}>
+              <Card
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'all 0.2s ease-in-out',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: 4,
+                  },
+                }}
+              >
+                <CardContent sx={{ flexGrow: 1 }}>
+                  <Box display="flex" alignItems="center" mb={1}>
+                    <Description color="primary" sx={{ mr: 1 }} />
+                    <Typography variant="h6" component="h3" noWrap>
+                      {doc.title}
+                    </Typography>
+                  </Box>
+                  
+                  <Typography 
+                    variant="body2" 
+                    color="text.secondary" 
+                    sx={{ 
+                      mb: 2,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {doc.description || 'No description'}
+                  </Typography>
+                  
+                  <Chip
+                    label={new Date(doc.createdAt).toLocaleDateString('ja-JP')}
+                    size="small"
+                    variant="outlined"
+                    sx={{ mb: 2 }}
+                  />
+                </CardContent>
+                
+                <Box display="flex" justifyContent="space-between" px={2} pb={2}>
+                  <IconButton 
+                    onClick={() => handleView(doc)} 
+                    color="primary"
+                    sx={{ 
+                      '&:hover': { 
+                        backgroundColor: 'primary.light',
+                        color: 'primary.contrastText',
+                      },
+                    }}
+                  >
                     <Visibility />
                   </IconButton>
                   <IconButton
                     onClick={() => handleDelete(doc.id)}
                     color="error"
+                    sx={{ 
+                      '&:hover': { 
+                        backgroundColor: 'error.light',
+                        color: 'error.contrastText',
+                      },
+                    }}
                   >
                     <Delete />
                   </IconButton>
                 </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-        {documents.length === 0 && !loading && (
-          <Grid item xs={12}>
-            <Card>
-              <CardContent sx={{ textAlign: 'center', py: 4 }}>
-                <Typography variant="body1" color="text.secondary">
-                  ドキュメントがありません
-                </Typography>
-                <Button
-                  variant="outlined"
-                  startIcon={<Add />}
-                  onClick={() => setOpen(true)}
-                  sx={{ mt: 2 }}
-                >
-                  最初のドキュメントを追加
-                </Button>
-              </CardContent>
-            </Card>
-          </Grid>
-        )}
-      </Grid>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      ) : totalCount === 0 ? (
+        <EmptyState
+          title="ドキュメントがありません"
+          description="最初のドキュメントをアップロードしてください"
+          actionLabel="ドキュメントを追加"
+          onAction={() => setOpen(true)}
+        />
+      ) : (
+        <EmptyState
+          title="検索結果が見つかりません"
+          description="検索条件を変更してみてください"
+          actionLabel="フィルターをクリア"
+          onAction={() => setFilters({
+            searchTerm: '',
+            sortBy: 'newest',
+            sortOrder: 'desc',
+            filterType: 'all',
+          })}
+        />
+      )}
 
-      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={open} onClose={handleCancel} maxWidth="sm" fullWidth>
         <DialogTitle>ドキュメントアップロード</DialogTitle>
-        <DialogContent>
-          <Box
-            {...getRootProps()}
-            sx={{
-              border: '2px dashed',
-              borderColor: isDragActive ? 'primary.main' : 'grey.300',
-              borderRadius: 1,
-              p: 3,
-              textAlign: 'center',
-              mb: 2,
-              cursor: 'pointer',
-              backgroundColor: isDragActive ? 'action.hover' : 'transparent',
-            }}
-          >
-            <input {...getInputProps()} />
-            <CloudUpload sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-            <Typography variant="body1" gutterBottom>
-              {selectedFile
-                ? `選択済み: ${selectedFile.name}`
-                : 'PDFファイルをドラッグ&ドロップまたはクリック'}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              *.pdf ファイルのみ対応
-            </Typography>
-          </Box>
-          <TextField
-            fullWidth
-            label="タイトル"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            margin="normal"
-            required
-          />
-          <TextField
-            fullWidth
-            label="説明（任意）"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            margin="normal"
-            multiline
-            rows={3}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpen(false)}>キャンセル</Button>
-          <Button
-            onClick={handleUpload}
-            variant="contained"
-            disabled={!selectedFile || !title.trim() || uploading}
-          >
-            {uploading ? 'アップロード中...' : 'アップロード'}
-          </Button>
-        </DialogActions>
+        <DocumentUploadForm
+          onSubmit={handleUpload}
+          onCancel={handleCancel}
+          loading={uploading}
+          error={uploadError}
+        />
       </Dialog>
     </Box>
   );
